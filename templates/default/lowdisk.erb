@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+#  This file is managed by Chef for <%= node['fqdn'] %>
+#+ Local modification will be overwritten.
+#
+#  This script checks all mounted filesystems for used space
+#+ (in percent) to see if they are below <%= @attr['threshold'] %>%.
+#+ If they are not a e-mail will be sent to <%= @attr['reportaddress'] %>.
+#
+#  This script is set up to be run as user <%= @attr['user'] %> every;
+<% @attr['cron'].each do |time, value| %>
+#+  <%= time.capitalize %>: <%= value %>
+<% end %>
+
+
+## DYNAMIC VARIABLES ##
+MAIL="<%= @attr['reportaddress'] %>"
+THRESHOLD="<%= @attr['threshold'] %>"
+<% if @attr['ignore'] %>
+IGNORE="<%= @attr['ignore'].join('|') %>"
+<% end %>
+
+
+## LOGIC ##
+while read PART SIZE USED FREE PERC MOUNT
+do
+  INUSE=${PERC//%/}
+  let "PFREE = 100 - $INUSE"
+  if [ $INUSE -ge $THRESHOLD ]; then
+    MSG=$MSG"\nPartition $MOUNT ($PART) has $FREE/$PFREE free space!"
+  fi
+done < <(df -PH | grep -E ^/ <% if @attr['ignore'] %>| grep -vE ^$IGNORE<% end %>)
+
+
+## MESSAGE ##
+if [ -n "$MSG" ]; then
+  echo -e "Some partition(s) use more than $THRESHOLD% of disk space!\n"$MSG | mail -s "Low free space on <%= node['fqdn'] %>" $MAIL
+fi

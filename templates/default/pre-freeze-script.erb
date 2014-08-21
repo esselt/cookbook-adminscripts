@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+#  This file is managed by Chef for <%= node['fqdn'] %>
+#+ Local modification will be overwritten.
+#
+#  This script is run right before a snapshot is taken
+#+ so that one freeze or stop services that needs to
+#+ have sane files, e.g. MySQL
+#
+
+
+## DYNAMIC VARIABLES ##
+MAIL="<%= @attr['reportaddress'] %>"
+<% if @attr['services'] %>
+SERVICES="<%= @attr['services'].join(' ') %>"
+
+## SHUT DOWN SERVICES ##
+for SERVICE in $SERVICES
+do
+  /usr/sbin/service $SERVICE stop > /dev/null || (
+    MSG=$MSG"\n$SERVICE did not stop correctly, trying to stop again.\n"
+    service $SERVICE stop > /dev/null
+  )
+done
+<% end %>
+
+<% if @attr['commands'] %>
+## OTHER COMMANDS ##
+<% @attr['commands'].each do |name, commands| %>
+# Name: <%= name %>
+<%= commands['freeze'] %> > /dev/null || (
+  MSG=$MSG"\n<%= commands['freeze'] %> did not stop correctly, trying to stop again."
+  <%= commands['freeze'] %> > /dev/null
+)
+
+<% end %>
+<% end %>
+
+## EMAIL IF ERROR AND EXIT ##
+if [ -n "$MSG" ]
+then
+  echo -e "There was an error on pre-freeze run!\n"$MSG | mail -s "Error on vmware quiesce pre-freeze for <%= node['fqdn'] %>" $MAIL
+fi
+
+exit 0
